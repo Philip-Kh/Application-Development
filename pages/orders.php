@@ -44,12 +44,16 @@ try {
     
     $whereClause = implode(' AND ', $where);
     
-    // Get orders
-    $sql = "SELECT o.*, p.product_name, s.full_name as staff_name 
-            FROM orders o 
-            JOIN products p ON o.product_id = p.product_id 
-            LEFT JOIN staff s ON o.staff_id = s.staff_id 
-            WHERE $whereClause 
+    // Get orders with item count
+    $sql = "SELECT o.*, s.full_name as staff_name,
+                   COUNT(oi.order_item_id) as item_count,
+                   GROUP_CONCAT(p.product_name SEPARATOR ', ') as product_names
+            FROM orders o
+            LEFT JOIN order_items oi ON o.order_id = oi.order_id
+            LEFT JOIN products p ON oi.product_id = p.product_id
+            LEFT JOIN staff s ON o.staff_id = s.staff_id
+            WHERE $whereClause
+            GROUP BY o.order_id
             ORDER BY o.created_at DESC";
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
@@ -210,8 +214,7 @@ try {
                         <tr>
                             <th>#</th>
                             <th>Type</th>
-                            <th>Product</th>
-                            <th>Quantity</th>
+                            <th>Items</th>
                             <th>Customer/Supplier</th>
                             <th>Amount</th>
                             <th>Date</th>
@@ -237,9 +240,9 @@ try {
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <strong><?php echo sanitize($order['product_name']); ?></strong>
+                                    <div><?php echo $order['item_count']; ?> item(s)</div>
+                                    <small class="text-muted"><?php echo sanitize(substr($order['product_names'], 0, 50)); ?><?php echo strlen($order['product_names']) > 50 ? '...' : ''; ?></small>
                                 </td>
-                                <td><?php echo number_format($order['quantity']); ?></td>
                                 <td><?php echo sanitize($order['customer_supplier_name']); ?></td>
                                 <td>
                                     <strong>$<?php echo number_format($order['total_amount'], 2); ?></strong>
@@ -247,9 +250,9 @@ try {
                                 <td><?php echo date('Y/m/d', strtotime($order['order_date'])); ?></td>
                                 <td><?php echo sanitize($order['staff_name'] ?? 'Unknown'); ?></td>
                                 <td>
-                                    <button 
-                                        class="btn btn-danger btn-icon btn-sm" 
-                                        onclick="confirmDelete(<?php echo $order['order_id']; ?>, '<?php echo $order['order_type'] === 'Sale' ? 'Sale' : 'Purchase'; ?>', '<?php echo sanitize($order['product_name']); ?>')"
+                                    <button
+                                        class="btn btn-danger btn-icon btn-sm"
+                                        onclick="confirmDelete(<?php echo $order['order_id']; ?>, '<?php echo $order['order_type'] === 'Sale' ? 'Sale' : 'Purchase'; ?>', '<?php echo sanitize($order['product_names']); ?>')"
                                         title="Delete"
                                     >
                                         <i class="fas fa-trash"></i>
@@ -280,12 +283,23 @@ try {
                 <div class="row" style="display: flex; gap: var(--spacing-md); margin-bottom: var(--spacing-lg);">
                     <div class="form-group" style="flex: 1; margin: 0;">
                         <label for="orderDate" class="form-label required">Date</label>
-                        <input 
-                            type="date" 
-                            id="orderDate" 
-                            name="order_date" 
-                            class="form-control" 
+                        <input
+                            type="date"
+                            id="orderDate"
+                            name="order_date"
+                            class="form-control"
                             value="<?php echo date('Y-m-d'); ?>"
+                            required
+                        >
+                    </div>
+                    <div class="form-group" style="flex: 1; margin: 0;">
+                        <label for="customerSupplier" class="form-label required">Customer/Supplier</label>
+                        <input
+                            type="text"
+                            id="customerSupplier"
+                            name="customer_supplier_name"
+                            class="form-control"
+                            placeholder="Enter customer or supplier name"
                             required
                         >
                     </div>
@@ -390,6 +404,7 @@ function openOrderModal(type) {
     // Reset form
     document.getElementById('orderForm').reset();
     document.getElementById('orderDate').value = '<?php echo date('Y-m-d'); ?>';
+    document.getElementById('customerSupplier').value = '';
     document.getElementById('totalAmount').textContent = '0.00';
     
     // Clear Items and Add First Row
@@ -427,10 +442,6 @@ function addProductRow() {
             <div style="flex: 1; min-width: 80px;">
                 <label class="form-label required" style="font-size: 0.85rem;">Quantity</label>
                 <input type="number" name="quantity[]" class="form-control qty-input" min="1" required oninput="calculateTotal()">
-            </div>
-            <div style="flex: 1.5; min-width: 150px;">
-                <label class="form-label required" style="font-size: 0.85rem;">${nameLabel}</label>
-                <input type="text" name="customer_supplier_name[]" class="form-control name-input" placeholder="${namePlaceholder}" required>
             </div>
         </div>
     `;
@@ -477,20 +488,20 @@ function updateRowInfo(rowId) {
 function calculateTotal() {
     let total = 0;
     let valid = true;
-    
+
     document.querySelectorAll('.order-row').forEach(row => {
         const select = row.querySelector('.product-select');
         const qtyInput = row.querySelector('.qty-input');
-        
+
         const option = select.options[select.selectedIndex];
-        
+
         if (option && option.value && qtyInput.value) {
             const price = parseFloat(option.dataset.price);
             const qty = parseInt(qtyInput.value);
             const max = parseInt(option.dataset.quantity);
-            
+
             total += price * qty;
-            
+
             // Validate Stock for Sale
             if (currentOrderType === 'Sale' && qty > max) {
                 valid = false;
@@ -500,7 +511,13 @@ function calculateTotal() {
             }
         }
     });
-    
+
+    // Check if customer/supplier is filled
+    const customerSupplier = document.getElementById('customerSupplier').value.trim();
+    if (!customerSupplier) {
+        valid = false;
+    }
+
     document.getElementById('totalAmount').textContent = total.toFixed(2);
     document.getElementById('submitOrderBtn').disabled = !valid;
 }
@@ -528,6 +545,9 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
         }
     });
 });
+
+// Add event listener for customer/supplier input
+document.getElementById('customerSupplier').addEventListener('input', calculateTotal);
 
 // Close modals on Escape key
 document.addEventListener('keydown', function(e) {

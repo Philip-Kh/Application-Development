@@ -33,14 +33,14 @@ try {
     $lowStockProducts = $stmt->fetchAll();
     
     // Get top selling products (based on sale orders)
-    // Get top selling products (based on sale orders)
     $stmt = $db->query("
-        SELECT p.product_name, SUM(o.quantity) as total_sold 
-        FROM orders o 
-        JOIN products p ON o.product_id = p.product_id 
-        WHERE o.order_type = 'Sale' 
-        GROUP BY o.product_id 
-        ORDER BY total_sold DESC 
+        SELECT p.product_name, SUM(oi.quantity) as total_sold
+        FROM orders o
+        JOIN order_items oi ON o.order_id = oi.order_id
+        JOIN products p ON oi.product_id = p.product_id
+        WHERE o.order_type = 'Sale'
+        GROUP BY oi.product_id
+        ORDER BY total_sold DESC
         LIMIT 5
     ");
     $topSelling = $stmt->fetchAll();
