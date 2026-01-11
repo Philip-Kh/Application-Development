@@ -6,13 +6,13 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/auth.php';
 
-// Only accept POST requests
+// Only accept POST requests - FAILED SCENARIO: If not POST, redirect with 'invalid' error
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ../../pages/orders.php?error=invalid');
     exit();
 }
 
-// Validate CSRF
+// Validate CSRF - FAILED SCENARIO: Invalid/missing CSRF token redirects with 'csrf' error
 if (!validateCSRFToken($_POST['csrf_token'] ?? '')) {
     header('Location: ../../pages/orders.php?error=csrf');
     exit();
@@ -27,7 +27,7 @@ $order_customer_supplier = trim($_POST['customer_supplier_name'] ?? '');
 $product_ids = $_POST['product_id'] ?? [];
 $quantities = $_POST['quantity'] ?? [];
 
-// Validation - Basic
+// Validation - Basic - FAILED SCENARIO: Invalid order type or missing data redirects with 'invalid' or 'empty' error
 if (!in_array($order_type, ['Sale', 'Purchase'])) {
     header('Location: ../../pages/orders.php?error=invalid');
     exit();
@@ -67,11 +67,11 @@ try {
 
         if (!$product) {
             $db->rollBack();
-            header('Location: ../../pages/orders.php?error=not_found');
+            header('Location: ../../pages/orders.php?error=not_found'); // FAILED SCENARIO: Product not found, transaction rolled back
             exit();
         }
 
-        // For sale orders, check if sufficient quantity
+        // For sale orders, check if sufficient quantity - FAILED SCENARIO: Overselling blocked, transaction rolled back, redirect with 'insufficient' error
         if ($order_type === 'Sale' && $qty > $product['quantity']) {
             $db->rollBack();
             header('Location: ../../pages/orders.php?error=insufficient');
@@ -150,7 +150,7 @@ try {
 
 } catch (Exception $e) {
     if ($db->inTransaction()) {
-        $db->rollBack();
+        $db->rollBack(); // FAILED SCENARIO: Any error during processing rolls back all changes
     }
     error_log("Create order error: " . $e->getMessage());
     header('Location: ../../pages/orders.php?error=server');

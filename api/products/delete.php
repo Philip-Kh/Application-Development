@@ -38,21 +38,14 @@ try {
         exit();
     }
 
-    // Check if product has orders
-    $stmt = $db->prepare("SELECT order_id FROM orders WHERE product_id = ? LIMIT 1");
+    // Delete order_items first to allow product deletion
+    $stmt = $db->prepare("DELETE FROM order_items WHERE product_id = ?");
     $stmt->execute([$product_id]);
 
-    if ($stmt->fetch()) {
-        // Soft delete - product has orders
-        $stmt = $db->prepare("UPDATE products SET is_deleted = 1, updated_by = ?, updated_at = NOW() WHERE product_id = ?");
-        $stmt->execute([getCurrentStaffId(), $product_id]);
-        $delete_type = 'soft';
-    } else {
-        // Hard delete - no orders
-        $stmt = $db->prepare("DELETE FROM products WHERE product_id = ?");
-        $stmt->execute([$product_id]);
-        $delete_type = 'hard';
-    }
+    // Hard delete the product
+    $stmt = $db->prepare("DELETE FROM products WHERE product_id = ?");
+    $stmt->execute([$product_id]);
+    $delete_type = 'hard';
 
     require_once __DIR__ . '/../../includes/activity_logger.php';
     logActivity('delete_product', 'product', $product_id, "Deleted product: {$product['product_name']} ($delete_type delete)");

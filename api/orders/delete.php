@@ -6,13 +6,13 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../includes/auth.php';
 
-// Only accept POST requests
+// Only accept POST requests - FAILED SCENARIO: If not POST, redirect with 'invalid' error
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ../../pages/orders.php?error=invalid');
     exit();
 }
 
-// Validate CSRF
+// Validate CSRF - FAILED SCENARIO: Invalid/missing CSRF token redirects with 'csrf' error
 if (!validateCSRFToken($_POST['csrf_token'] ?? '')) {
     header('Location: ../../pages/orders.php?error=csrf');
     exit();
@@ -36,7 +36,7 @@ try {
 
     if (!$order) {
         $db->rollBack();
-        header('Location: ../../pages/orders.php?error=not_found');
+        header('Location: ../../pages/orders.php?error=not_found'); // FAILED SCENARIO: Order not found, transaction rolled back
         exit();
     }
 
@@ -86,7 +86,9 @@ try {
     exit();
 
 } catch (PDOException $e) {
-    $db->rollBack();
+    if ($db->inTransaction()) {
+        $db->rollBack(); // FAILED SCENARIO: Any database error rolls back the transaction
+    }
     error_log("Delete order error: " . $e->getMessage());
     header('Location: ../../pages/orders.php?error=server');
     exit();

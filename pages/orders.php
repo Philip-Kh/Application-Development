@@ -312,6 +312,14 @@ try {
                     <!-- Dynamic Rows will be added here -->
                 </div>
 
+                <!-- Stock Error Messages -->
+                <div id="stockErrors" class="mb-4" style="display: none;">
+                    <div class="alert alert-error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <div id="stockErrorMessages"></div>
+                    </div>
+                </div>
+
                 <button type="button" class="btn btn-secondary btn-sm mb-4" onclick="addProductRow()">
                     <i class="fas fa-plus"></i> Add Another Product
                 </button>
@@ -488,8 +496,9 @@ function updateRowInfo(rowId) {
 function calculateTotal() {
     let total = 0;
     let valid = true;
+    let errorMessages = [];
 
-    document.querySelectorAll('.order-row').forEach(row => {
+    document.querySelectorAll('.order-row').forEach((row, index) => {
         const select = row.querySelector('.product-select');
         const qtyInput = row.querySelector('.qty-input');
 
@@ -499,6 +508,7 @@ function calculateTotal() {
             const price = parseFloat(option.dataset.price);
             const qty = parseInt(qtyInput.value);
             const max = parseInt(option.dataset.quantity);
+            const productName = option.text.split(' (Qty:')[0]; // Extract product name
 
             total += price * qty;
 
@@ -506,6 +516,7 @@ function calculateTotal() {
             if (currentOrderType === 'Sale' && qty > max) {
                 valid = false;
                 qtyInput.classList.add('error');
+                errorMessages.push(`Item ${index + 1} (${productName}): Quantity exceeds available stock (${qty} > ${max})`);
             } else {
                 qtyInput.classList.remove('error');
             }
@@ -516,6 +527,16 @@ function calculateTotal() {
     const customerSupplier = document.getElementById('customerSupplier').value.trim();
     if (!customerSupplier) {
         valid = false;
+    }
+
+    // Show/hide error messages
+    const stockErrors = document.getElementById('stockErrors');
+    const stockErrorMessages = document.getElementById('stockErrorMessages');
+    if (errorMessages.length > 0) {
+        stockErrorMessages.innerHTML = errorMessages.join('<br>');
+        stockErrors.style.display = 'block';
+    } else {
+        stockErrors.style.display = 'none';
     }
 
     document.getElementById('totalAmount').textContent = total.toFixed(2);

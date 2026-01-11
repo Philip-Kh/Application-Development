@@ -3,10 +3,13 @@
  * Main Stylesheet - LTR English Support
  */
 
+/* Import Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 /* ========================================
-   CSS Variables & Design System
-   ======================================== */
-:root {
+    CSS Variables & Design System
+    ======================================== */
+ :root {
     /* Colors */
     --primary: #6366f1;
     --primary-dark: #4f46e5;
@@ -107,12 +110,9 @@ body {
     text-align: left;
 }
 
-/* Import Google Font */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
 /* ========================================
-   Layout Components
-   ======================================== */
+    Layout Components
+    ======================================== */
 .app-container {
     min-height: 100vh;
     display: flex;
@@ -560,6 +560,8 @@ body {
 
 .form-control.error {
     border-color: var(--danger);
+    background-color: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
 }
 
 .form-control.success {
